@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { fetchRepoFileTree } from '../services/githubService';
 import { generateInfographic } from '../services/geminiService';
 import { RepoFileTree, ViewMode, RepoHistoryItem } from '../types';
@@ -156,6 +156,7 @@ const RepoAnalyzer: React.FC<RepoAnalyzerProps> = ({ onNavigate, history, onAddT
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingStage, setLoadingStage] = useState<string>('');
+  const formRef = useRef<HTMLFormElement>(null);
   
   // Infographic State
   const [infographicData, setInfographicData] = useState<string | null>(null);
@@ -166,6 +167,21 @@ const RepoAnalyzer: React.FC<RepoAnalyzerProps> = ({ onNavigate, history, onAddT
   
   // Viewer State
   const [fullScreenImage, setFullScreenImage] = useState<{src: string, alt: string} | null>(null);
+
+  // Shortcut Listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Trigger on Ctrl+Enter or Cmd+Enter
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+          if (formRef.current && repoInput.trim() && !loading) {
+              e.preventDefault();
+              formRef.current.requestSubmit();
+          }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [repoInput, loading]);
 
   const parseRepoInput = (input: string): { owner: string, repo: string } | null => {
     const cleanInput = input.trim().replace(/\/$/, '');
@@ -306,7 +322,7 @@ const RepoAnalyzer: React.FC<RepoAnalyzerProps> = ({ onNavigate, history, onAddT
 
       {/* Input Section */}
       <div className="max-w-xl mx-auto relative z-10">
-        <form onSubmit={handleAnalyze} className="glass-panel rounded-2xl p-2 transition-all focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500/50">
+        <form ref={formRef} onSubmit={handleAnalyze} className="glass-panel rounded-2xl p-2 transition-all focus-within:ring-1 focus-within:ring-violet-500/50 focus-within:border-violet-500/50">
           <div className="flex items-center">
              <div className="pl-3 text-slate-500">
                 <Command className="w-5 h-5" />
@@ -323,8 +339,16 @@ const RepoAnalyzer: React.FC<RepoAnalyzerProps> = ({ onNavigate, history, onAddT
                 type="submit"
                 disabled={loading || !repoInput.trim()}
                 className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 border border-white/10 font-mono text-sm"
+                title="Ctrl+Enter to run"
                 >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "RUN_ANALYSIS"}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                  <>
+                    RUN_ANALYSIS
+                    <span className="hidden sm:inline-flex items-center gap-0.5 ml-1 px-1.5 py-0.5 rounded bg-white/5 text-[9px] text-slate-400 border border-white/5">
+                      <span className="text-[10px]">⌘</span>↵
+                    </span>
+                  </>
+                )}
                 </button>
              </div>
           </div>

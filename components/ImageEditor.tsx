@@ -6,7 +6,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { editImageWithGemini } from '../services/geminiService';
 import { ViewMode } from '../types';
-import { Upload, Wand2, Loader2, Download, ImageIcon, Palette, Terminal, ArrowLeft } from 'lucide-react';
+import { Upload, Wand2, Loader2, Download, ImageIcon, Palette, Terminal, ArrowLeft, Undo, Redo, History as HistoryIcon, RotateCcw } from 'lucide-react';
 
 const STYLE_PRESETS = [
   "Neon Cyberpunk",
@@ -21,12 +21,23 @@ interface ImageEditorProps {
   onNavigate?: (mode: ViewMode) => void;
 }
 
+interface HistoryItem {
+  data: string;
+  prompt: string;
+  timestamp: number;
+}
+
 const ImageEditor: React.FC<ImageEditorProps> = ({ initialState, onNavigate }) => {
   const [imageData, setImageData] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState<string>('');
   const [prompt, setPrompt] = useState('');
   const [processing, setProcessing] = useState(false);
   const [editedImageData, setEditedImageData] = useState<string | null>(null);
+  
+  // History State
+  const [editHistory, setEditHistory] = useState<HistoryItem[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -34,6 +45,9 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ initialState, onNavigate }) =
       setImageData(initialState.data);
       setMimeType(initialState.mimeType);
       setEditedImageData(null);
+      // Reset history on new initial state
+      setEditHistory([]);
+      setHistoryIndex(-1);
     }
   }, [initialState]);
 
@@ -51,6 +65,9 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ initialState, onNavigate }) =
         setImageData(base64Data);
         setMimeType(file.type);
         setEditedImageData(null);
+        // Reset history on new file upload
+        setEditHistory([]);
+        setHistoryIndex(-1);
       };
       reader.readAsDataURL(file);
     }
@@ -65,6 +82,15 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ initialState, onNavigate }) =
       const resultBase64 = await editImageWithGemini(imageData, mimeType, prompt);
       if (resultBase64) {
         setEditedImageData(resultBase64);
+        
+        // Add to history
+        setEditHistory(prev => {
+           // If we are in the middle of history (undone state), truncate the future
+           const newHistory = prev.slice(0, historyIndex + 1);
+           return [...newHistory, { data: resultBase64, prompt: prompt, timestamp: Date.now() }];
+        });
+        setHistoryIndex(prev => prev + 1);
+
       } else {
         alert('Could not generate edited image.');
       }
@@ -73,7 +99,40 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ initialState, onNavigate }) =
     } finally {
       setProcessing(false);
     }
-  }, [imageData, mimeType, prompt]);
+  }, [imageData, mimeType, prompt, historyIndex]);
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+       const newIndex = historyIndex - 1;
+       setHistoryIndex(newIndex);
+       const item = editHistory[newIndex];
+       setEditedImageData(item.data);
+       setPrompt(item.prompt);
+    } else if (historyIndex === 0) {
+       // Revert to initial state (no edits)
+       setHistoryIndex(-1);
+       setEditedImageData(null);
+       // Optional: Keep the prompt or clear it? Keeping it is usually more user friendly.
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < editHistory.length - 1) {
+       const newIndex = historyIndex + 1;
+       setHistoryIndex(newIndex);
+       const item = editHistory[newIndex];
+       setEditedImageData(item.data);
+       setPrompt(item.prompt);
+    }
+  };
+
+  const handleResetHistory = () => {
+      if (window.confirm("Are you sure you want to clear all edit history?")) {
+          setEditHistory([]);
+          setHistoryIndex(-1);
+          setEditedImageData(null);
+      }
+  }
 
   const applyStylePreset = (style: string) => {
     setPrompt(`Redraw this exact infographic in a ${style} style. Maintain all text labels, connection lines, and overall structure accurately, but change the visual theme completely to match ${style}.`);
@@ -204,7 +263,54 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ initialState, onNavigate }) =
                 </div>
                 )}
             </div>
+            
+            {/* History Status Indicator Overlay */}
+            {!processing && editedImageData && (
+                <div className="absolute top-4 right-4 bg-black/40 backdrop-blur-md rounded-full px-3 py-1 border border-white/10 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse"></div>
+                    <span className="text-[10px] font-mono text-white/80">LIVE_VIEW</span>
+                </div>
+            )}
           </div>
+          
+          {/* History Controls */}
+          {editHistory.length > 0 && (
+              <div className="glass-panel p-2 rounded-xl flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center gap-1">
+                      <button 
+                        onClick={handleUndo} 
+                        disabled={historyIndex < 0}
+                        className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Undo"
+                      >
+                          <Undo className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={handleRedo}
+                        disabled={historyIndex >= editHistory.length - 1}
+                        className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Redo"
+                      >
+                          <Redo className="w-4 h-4" />
+                      </button>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 px-3 py-1 bg-slate-950/50 rounded-lg border border-white/5">
+                      <HistoryIcon className="w-3 h-3 text-pink-500" />
+                      <span className="text-xs font-mono text-slate-300">
+                          {historyIndex + 1} <span className="text-slate-600">/</span> {editHistory.length}
+                      </span>
+                  </div>
+
+                   <button 
+                        onClick={handleResetHistory}
+                        className="p-2 hover:bg-red-500/10 rounded-lg text-slate-500 hover:text-red-400 transition-colors"
+                        title="Clear History"
+                      >
+                          <RotateCcw className="w-4 h-4" />
+                  </button>
+              </div>
+          )}
 
           {editedImageData && !processing && (
             <a 

@@ -10,7 +10,7 @@ import Home from './components/Home';
 import IntroAnimation from './components/IntroAnimation';
 import ApiKeyModal from './components/ApiKeyModal';
 import { ViewMode, RepoHistoryItem, ArticleHistoryItem } from './types';
-import { Github, PenTool, GitBranch, FileText, Home as HomeIcon, CreditCard } from 'lucide-react';
+import { Github, PenTool, GitBranch, FileText, Home as HomeIcon, CreditCard, Keyboard } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewMode>(ViewMode.HOME);
@@ -67,6 +67,35 @@ const App: React.FC = () => {
     };
     checkKey();
   }, []);
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Disable shortcuts if no API key or intro is showing
+      if (!hasApiKey || showIntro) return;
+
+      // Navigation Shortcuts: Alt + 1/2/3
+      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        switch (e.key) {
+          case '1':
+            e.preventDefault();
+            setCurrentView(ViewMode.HOME);
+            break;
+          case '2':
+            e.preventDefault();
+            setCurrentView(ViewMode.REPO_ANALYZER);
+            break;
+          case '3':
+            e.preventDefault();
+            setCurrentView(ViewMode.ARTICLE_INFOGRAPHIC);
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hasApiKey, showIntro]);
 
   // Persist Repo History updates
   useEffect(() => {
@@ -159,33 +188,38 @@ const App: React.FC = () => {
             <div className="glass-panel p-1 md:p-1.5 rounded-full flex relative shadow-2xl">
                 <button
                 onClick={() => setCurrentView(ViewMode.HOME)}
-                className="relative flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-full font-medium text-sm transition-all duration-300 font-mono text-slate-500 hover:text-slate-300 hover:bg-white/5"
-                title="Home"
+                className="relative flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-full font-medium text-sm transition-all duration-300 font-mono text-slate-500 hover:text-slate-300 hover:bg-white/5 group"
+                title="Home (Alt+1)"
                 >
                 <HomeIcon className="w-4 h-4" />
+                <span className="text-[9px] opacity-40 ml-0.5 group-hover:opacity-80 transition-opacity hidden lg:inline">Alt+1</span>
                 </button>
                 <div className="w-px h-6 bg-white/10 my-auto mx-1"></div>
                 <button
                 onClick={() => setCurrentView(ViewMode.REPO_ANALYZER)}
-                className={`relative flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-full font-medium text-sm transition-all duration-300 font-mono ${
+                className={`relative flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-full font-medium text-sm transition-all duration-300 font-mono group ${
                     currentView === ViewMode.REPO_ANALYZER
                     ? 'text-white bg-white/10 shadow-glass-inset border border-white/10'
                     : 'text-slate-500 hover:text-slate-300'
                 }`}
+                title="GitFlow (Alt+2)"
                 >
                 <GitBranch className="w-4 h-4" />
                 <span className="hidden sm:inline">GitFlow</span>
+                <span className={`text-[9px] ml-1.5 hidden lg:inline ${currentView === ViewMode.REPO_ANALYZER ? 'text-white/40' : 'text-slate-600 group-hover:text-slate-400'}`}>Alt+2</span>
                 </button>
                 <button
                 onClick={() => setCurrentView(ViewMode.ARTICLE_INFOGRAPHIC)}
-                className={`relative flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-full font-medium text-sm transition-all duration-300 font-mono ${
+                className={`relative flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-full font-medium text-sm transition-all duration-300 font-mono group ${
                     currentView === ViewMode.ARTICLE_INFOGRAPHIC
                     ? 'text-emerald-100 bg-emerald-500/10 shadow-glass-inset border border-emerald-500/20'
                     : 'text-slate-500 hover:text-slate-300'
                 }`}
+                title="SiteSketch (Alt+3)"
                 >
                 <FileText className="w-4 h-4" />
                 <span className="hidden sm:inline">SiteSketch</span>
+                <span className={`text-[9px] ml-1.5 hidden lg:inline ${currentView === ViewMode.ARTICLE_INFOGRAPHIC ? 'text-emerald-300/40' : 'text-slate-600 group-hover:text-slate-400'}`}>Alt+3</span>
                 </button>
             </div>
             </div>
@@ -216,10 +250,15 @@ const App: React.FC = () => {
       </main>
 
       <footer className="py-6 mt-auto border-t border-white/5">
-        <div className="max-w-7xl mx-auto text-center px-4">
+        <div className="max-w-7xl mx-auto text-center px-4 flex flex-col items-center gap-2">
           <p className="text-xs font-mono text-slate-600">
             <span className="text-violet-500/70">link</span>:<span className="text-emerald-500/70">ink</span>$ Powered by Nano Banana Pro
           </p>
+          <div className="flex items-center gap-4 text-[10px] font-mono text-slate-700">
+             <span className="flex items-center gap-1"><Keyboard className="w-3 h-3" /> Shortcuts:</span>
+             <span className="bg-white/5 px-1.5 py-0.5 rounded">Alt+1..3 Nav</span>
+             <span className="bg-white/5 px-1.5 py-0.5 rounded">⌘/Ctrl+↵ Run</span>
+          </div>
         </div>
       </footer>
     </div>

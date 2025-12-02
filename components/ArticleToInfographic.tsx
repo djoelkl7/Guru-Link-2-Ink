@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { generateArticleInfographic } from '../services/geminiService';
 import { Citation, ArticleHistoryItem } from '../types';
 import { Link, Loader2, Download, Sparkles, AlertCircle, Palette, Globe, ExternalLink, BookOpen, Clock, Maximize, Grid2X2, Layers, Ratio } from 'lucide-react';
@@ -61,9 +61,25 @@ const ArticleToInfographic: React.FC<ArticleToInfographicProps> = ({ history, on
   const [citations, setCitations] = useState<Citation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadingStage, setLoadingStage] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
   
   // Viewer State
   const [fullScreenImage, setFullScreenImage] = useState<{src: string, alt: string} | null>(null);
+
+  // Shortcut Listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        // Trigger on Ctrl+Enter or Cmd+Enter
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+            if (formRef.current && urlInput.trim() && !loading) {
+                e.preventDefault();
+                formRef.current.requestSubmit();
+            }
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [urlInput, loading]);
 
   const addToHistory = (url: string, imgs: string[], cites: Citation[]) => {
       let title = url;
@@ -149,7 +165,7 @@ const ArticleToInfographic: React.FC<ArticleToInfographicProps> = ({ history, on
 
       {/* Input Section */}
       <div className="glass-panel rounded-3xl p-6 md:p-10 space-y-8 relative z-10">
-         <form onSubmit={handleGenerate} className="space-y-8">
+         <form ref={formRef} onSubmit={handleGenerate} className="space-y-8">
             <div className="space-y-4">
                 <label className="text-xs text-emerald-400 font-mono tracking-wider flex items-center gap-2">
                     <Link className="w-4 h-4" /> SOURCE_URL
@@ -281,9 +297,17 @@ const ArticleToInfographic: React.FC<ArticleToInfographicProps> = ({ history, on
                 type="submit"
                 disabled={loading || !urlInput.trim()}
                 className="w-full py-5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-300 rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-mono text-base tracking-wider hover:shadow-neon-emerald"
+                title="Ctrl+Enter to generate"
             >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
-                {loading ? "PROCESSING..." : `GENERATE ${variationCount > 1 ? `${variationCount} VARIATIONS` : 'INFOGRAPHIC'}`}
+                {loading ? "PROCESSING..." : (
+                    <>
+                        GENERATE {variationCount > 1 ? `${variationCount} VARIATIONS` : 'INFOGRAPHIC'}
+                        <span className="hidden sm:inline-flex items-center gap-0.5 ml-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-[10px] text-emerald-500/70 border border-emerald-500/20">
+                            <span className="text-[11px]">⌘</span>↵
+                        </span>
+                    </>
+                )}
             </button>
          </form>
       </div>
